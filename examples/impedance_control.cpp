@@ -73,8 +73,6 @@ int main(int argc, char* argv[])
   // --------------- INITIALIZATION END -------------------
 
   bool first_pass = true;
-  bool passed_negative_part = false;
-  bool passed_positive_part = false;
   URCL_LOG_INFO("Start moving the robot");
   urcl::vector6d_t joint_target = { 0, 0, 0, 0, 0, 0 };
   urcl::vector6d_t start_positions = { 0, 0, 0, 0, 0, 0 };
@@ -116,7 +114,7 @@ int main(int argc, char* argv[])
     joint_target[5] = start_positions[5] + 0.2 * sin(time);
     // Setting the RobotReceiveTimeout time is for example purposes only. This will make the example running more
     // reliable on non-realtime systems. Use with caution in productive applications.
-    bool ret = g_my_robot->getUrDriver()->writeJointCommand(joint_target, comm::ControlMode::MODE_PD_CONTROLLER_JOINT,
+    bool ret = g_my_robot->getUrDriver()->writeJointCommand(joint_target, comm::ControlMode::MODE_IMPEDANCE,
                                                             RobotReceiveTimeout::millisec(100));
     if (!ret)
     {
