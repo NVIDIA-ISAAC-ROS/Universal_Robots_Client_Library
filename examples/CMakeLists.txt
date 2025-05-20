@@ -51,3 +51,7 @@ target_link_libraries(trajectory_point_interface_example ur_client_library::urcl
 add_executable(instruction_executor
 instruction_executor.cpp)
 target_link_libraries(instruction_executor ur_client_library::urcl)
+
+add_executable(impedance_control
+impedance_control.cpp)
+target_link_libraries(impedance_control ur_client_library::urcl)
