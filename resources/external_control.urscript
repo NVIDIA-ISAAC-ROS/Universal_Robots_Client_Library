@@ -849,7 +849,7 @@ while control_mode > MODE_STOPPED:
       end
     elif control_mode == MODE_IMPEDANCE:
       q = [params_mult[2] / MULT_jointstate, params_mult[3] / MULT_jointstate, params_mult[4] / MULT_jointstate, params_mult[5] / MULT_jointstate, params_mult[6] / MULT_jointstate, params_mult[7] / MULT_jointstate]
-      set_servo_setpoint(q)
+      cmd_servo_q = q
     end
     # Tool contact is running, but hasn't been detected
     if tool_contact_running == True and control_mode != MODE_TOOL_IN_CONTACT:
