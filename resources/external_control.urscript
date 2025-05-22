@@ -25,6 +25,7 @@ MODE_SPEEDL = 4
 MODE_POSE = 5
 MODE_FREEDRIVE = 6
 MODE_TOOL_IN_CONTACT = 7
+MODE_IMPEDANCE = 8
 # Data dimensions of the message received on the reverse interface
 REVERSE_INTERFACE_DATA_DIMENSION = 8
 
@@ -66,6 +67,13 @@ MAX_JOINT_SPEED = 6.283185
 # Any motion commands resulting in a velocity higher than that will be ignored.
 JOINT_IGNORE_SPEED = 20.0
 
+# UR10e (https://www.universal-robots.com/articles/ur/robot-care-maintenance/max-joint-torques-cb3-and-e-series)
+MAX_JOINT_TORQUES = [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]
+
+# PD gains
+K_P = [1320.0, 1320.0, 600.0, 216.0, 216.0, 216.0]
+K_D = [72.0, 72.0, 50.0, 30.0, 30.0, 30.0]
+
 #Global variables are also showed in the Teach pendants variable list
 global violation_popup_counter = 0
 global cmd_servo_state = SERVO_UNINITIALIZED
@@ -86,6 +94,33 @@ global trajectory_result = 0
 thread_move = 0
 thread_trajectory = 0
 thread_script_commands = 0
+
+###
+# @brief Function to clamp each element of a list in between +- clamp value.
+#
+# @param values array is the list of values to clamp
+# @param clampvalues array is the list of clamp values
+#
+# @returns array of values within +- clamp value
+###
+def clamp_array(values, clampValues):
+  if length(values) != length(clampValues):
+    popup("List of values has different length than list of clamp values.", error = True, blocking = True)
+  end
+  pdiff = values - clampValues
+  mdiff = values + clampValues
+  ret = values
+  j = 0
+  while j < length(values):
+    if pdiff[j] > 0:
+        ret[j] = clampValues[j]
+    elif mdiff[j] < 0:
+        ret[j] = -clampValues[j]
+    end
+    j = j + 1
+  end
+  return ret
+end
 
 ###
 # @brief Function to verify whether the specified target can be reached within the defined time frame while staying within
@@ -624,6 +659,22 @@ thread servoThreadP():
   stopj(STOPJ_ACCELERATION)
 end
 
+thread impedance_control():
+  textmsg("Starting impedance control")
+  while control_mode == MODE_IMPEDANCE:
+    enter_critical
+    q = get_actual_joint_positions()
+    q_dot = get_actual_joint_speeds()
+
+    q_err = cmd_servo_q - q
+    tau = K_P * q_err - K_D * q_dot
+    torque_command(clamp_array(tau, MAX_JOINT_TORQUES), friction_comp=False)
+    exit_critical
+  end
+  textmsg("impedance control ended")
+  stopj(STOPJ_ACCELERATION)
+end
+
 def tool_contact_detection():
   # Detect tool contact in the directions that the TCP is moving
   step_back = tool_contact(direction = get_actual_tcp_speed())
@@ -756,6 +807,9 @@ while control_mode > MODE_STOPPED:
       elif control_mode == MODE_POSE:
         cmd_servo_q = get_joint_positions()
         thread_move = run servoThreadP()
+      elif control_mode == MODE_IMPEDANCE:
+        cmd_servo_q = get_joint_positions()
+        thread_move = run impedance_control()
       end
     end
 
@@ -793,6 +847,9 @@ while control_mode > MODE_STOPPED:
         textmsg("Leaving freedrive mode")
         end_freedrive_mode()
       end
+    elif control_mode == MODE_IMPEDANCE:
+      q = [params_mult[2] / MULT_jointstate, params_mult[3] / MULT_jointstate, params_mult[4] / MULT_jointstate, params_mult[5] / MULT_jointstate, params_mult[6] / MULT_jointstate, params_mult[7] / MULT_jointstate]
+      cmd_servo_q = q
     end
     # Tool contact is running, but hasn't been detected
     if tool_contact_running == True and control_mode != MODE_TOOL_IN_CONTACT:
