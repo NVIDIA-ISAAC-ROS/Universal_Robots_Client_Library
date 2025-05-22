@@ -146,11 +146,14 @@ void UrDriver::init(const UrDriverConfiguration& config)
 
   std::stringstream impedance_control_replace;
   if (robot_version_.major >= 5 && robot_version_.minor >= 22) {
-    // UR3/UR3e: [54.0, 54.0, 28.0, 9.0, 9.0, 9.0]
-    // UR5/UR5e: [150.0, 150.0, 150.0, 28.0, 28.0, 28.0]
-    // UR10/UR10e/UR16e: [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]
-    impedance_control_replace << "MAX_JOINT_TORQUES = [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]\n"
-                              << "ZETA = 1.0\n"
+    /*
+      TODO(ayusmans): update max joint torques based on robot type
+      UR3/UR3e: [54.0, 54.0, 28.0, 9.0, 9.0, 9.0]
+      UR5/UR5e: [150.0, 150.0, 150.0, 28.0, 28.0, 28.0]
+      UR10/UR10e/UR16e: [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]
+    */
+    impedance_control_replace << "MAX_JOINT_TORQUES = [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]\n";
+    impedance_control_replace << "ZETA = 1.0\n"
                               << "K_P = MAX_JOINT_TORQUES * 4\n"
                               << "K_D = make_list(length(K_P), 0)\n"
                               << "i = 0\n"
@@ -169,9 +172,9 @@ void UrDriver::init(const UrDriverConfiguration& config)
                               << "  exit_critical\n"
                               << "end\n"
                               << "textmsg(\"impedance control ended\")\n"
-                              << "stopj(STOPJ_ACCELERATION)"
+                              << "stopj(STOPJ_ACCELERATION)";
   } else {
-    impedance_control_replace << "popup(\"Impedance control requires PolyScope 5.22 or greater.\", error = True, blocking = True)";
+    impedance_control_replace << "popup(\"Impedance control requires PolyScope 5.22 or greater.\", error = True, blocking = False)";
   }
   prog.replace(prog.find(IMPEDANCE_CONTROL_REPLACE), IMPEDANCE_CONTROL_REPLACE.length(), impedance_control_replace.str());
 
