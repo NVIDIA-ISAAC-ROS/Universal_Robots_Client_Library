@@ -51,6 +51,8 @@ static const std::string TRAJECTORY_PORT_REPLACE("{{TRAJECTORY_SERVER_PORT_REPLA
 static const std::string SCRIPT_COMMAND_PORT_REPLACE("{{SCRIPT_COMMAND_SERVER_PORT_REPLACE}}");
 static const std::string FORCE_MODE_SET_DAMPING_REPLACE("{{FORCE_MODE_SET_DAMPING_REPLACE}}");
 static const std::string FORCE_MODE_SET_GAIN_SCALING_REPLACE("{{FORCE_MODE_SET_GAIN_SCALING_REPLACE}}");
+static const std::string IMPEDANCE_CONTROL_REPLACE("{{IMPEDANCE_CONTROL_REPLACE}}");
+
 
 void UrDriver::init(const UrDriverConfiguration& config)
 {
@@ -141,6 +143,37 @@ void UrDriver::init(const UrDriverConfiguration& config)
                   << config.tool_comm_setup->getTxIdleChars() << ")";
   }
   prog.replace(prog.find(BEGIN_REPLACE), BEGIN_REPLACE.length(), begin_replace.str());
+
+  std::stringstream impedance_control_replace;
+  if (robot_version_.major >= 5 && robot_version_.minor >= 22) {
+    // UR3/UR3e: [54.0, 54.0, 28.0, 9.0, 9.0, 9.0]
+    // UR5/UR5e: [150.0, 150.0, 150.0, 28.0, 28.0, 28.0]
+    // UR10/UR10e/UR16e: [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]
+    impedance_control_replace << "MAX_JOINT_TORQUES = [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]\n"
+                              << "ZETA = 1.0\n"
+                              << "K_P = MAX_JOINT_TORQUES * 4\n"
+                              << "K_D = make_list(length(K_P), 0)\n"
+                              << "i = 0\n"
+                              << "while i < length(K_D):\n"
+                              << "    K_D[i] = 2 * ZETA * sqrt(K_P[i])\n"
+                              << "    i = i + 1\n"
+                              << "end\n"
+                              << "textmsg(\"Starting impedance control\")\n"
+                              << "while control_mode == MODE_IMPEDANCE:\n"
+                              << "  enter_critical\n"
+                              << "  q = get_actual_joint_positions()\n"
+                              << "  q_dot = get_actual_joint_speeds()\n"
+                              << "  q_err = cmd_servo_q - q\n"
+                              << "  tau = K_P * q_err - K_D * q_dot\n"
+                              << "  torque_command(clamp_array(tau, MAX_JOINT_TORQUES), friction_comp=False)\n"
+                              << "  exit_critical\n"
+                              << "end\n"
+                              << "textmsg(\"impedance control ended\")\n"
+                              << "stopj(STOPJ_ACCELERATION)"
+  } else {
+    impedance_control_replace << "popup(\"Impedance control requires PolyScope 5.22 or greater.\", error = True, blocking = True)";
+  }
+  prog.replace(prog.find(IMPEDANCE_CONTROL_REPLACE), IMPEDANCE_CONTROL_REPLACE.length(), impedance_control_replace.str());
 
   trajectory_interface_.reset(new control::TrajectoryPointInterface(config.trajectory_port));
   script_command_interface_.reset(new control::ScriptCommandInterface(config.script_command_port));
