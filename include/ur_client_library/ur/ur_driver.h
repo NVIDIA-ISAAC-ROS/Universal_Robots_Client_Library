@@ -51,6 +51,7 @@ namespace urcl
  */
 struct UrDriverConfiguration
 {
+  std::string robot_model;         //!< Model of the robot, e.g. "UR10e", "UR5e", etc.
   std::string robot_ip;            //!< IP-address under which the robot is reachable.
   std::string script_file;         //!< URScript file that should be sent to the robot.
   std::string output_recipe_file;  //!< Filename where the output recipe is stored in.
@@ -190,6 +191,7 @@ public:
    * from \p script_file, perform a number of replacements to populate the script with dynamic data.
    * See the implementation for details.
    *
+   * \param robot_model robot model.
    * \param robot_ip IP-address under which the robot is reachable.
    * \param script_file URScript file that should be sent to the robot.
    * \param output_recipe_file Filename where the output recipe is stored in.
@@ -217,7 +219,7 @@ public:
   // Called sigA in tests
   [[deprecated("Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const "
                "UrDriverConfiguration& config) instead. This function will be removed in May 2027.")]]
-  UrDriver(const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
+  UrDriver(const std::string& robot_model, const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
            const std::string& input_recipe_file, std::function<void(bool)> handle_program_state, bool headless_mode,
            std::unique_ptr<ToolCommSetup> tool_comm_setup, const uint32_t reverse_port = 50001,
            const uint32_t script_sender_port = 50002, int servoj_gain = 2000, double servoj_lookahead_time = 0.03,
@@ -225,6 +227,7 @@ public:
            const uint32_t script_command_port = 50004)
   {
     UrDriverConfiguration config;
+    config.robot_model = robot_model;
     config.robot_ip = robot_ip;
     config.script_file = script_file;
     config.output_recipe_file = output_recipe_file;
@@ -249,6 +252,7 @@ public:
    * \deprecated Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const
    *             UrDriverConfiguration& config) instead. This function will be removed in May 2027.
    *
+   * \param robot_model robot model.
    * \param robot_ip IP-address under which the robot is reachable.
    * \param script_file URScript file that should be sent to the robot.
    * \param output_recipe_file Filename where the output recipe is stored in.
@@ -278,7 +282,7 @@ public:
   // Called sigB in tests
   [[deprecated("Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const "
                "UrDriverConfiguration& config) instead. This function will be removed in May 2027.")]]
-  UrDriver(const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
+  UrDriver(const std::string& robot_model, const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
            const std::string& input_recipe_file, std::function<void(bool)> handle_program_state, bool headless_mode,
            std::unique_ptr<ToolCommSetup> tool_comm_setup, const uint32_t reverse_port,
            const uint32_t script_sender_port, int servoj_gain, double servoj_lookahead_time, bool non_blocking_read,
@@ -286,6 +290,7 @@ public:
            double force_mode_damping, double force_mode_gain_scaling = 0.5)
   {
     UrDriverConfiguration config;
+    config.robot_model = robot_model;
     config.robot_ip = robot_ip;
     config.script_file = script_file;
     config.output_recipe_file = output_recipe_file;
@@ -312,6 +317,7 @@ public:
    * \deprecated Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const
    *             UrDriverConfiguration& config) instead. This function will be removed in May 2027.
    *
+   * \param robot_model robot model.
    * \param robot_ip IP-address under which the robot is reachable.
    * \param script_file URScript file that should be sent to the robot.
    * \param output_recipe_file Filename where the output recipe is stored in.
@@ -342,7 +348,7 @@ public:
   // Called sigC in tests
   [[deprecated("Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const "
                "UrDriverConfiguration& config) instead. This function will be removed in May 2027.")]]
-  UrDriver(const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
+  UrDriver(const std::string& robot_model, const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
            const std::string& input_recipe_file, std::function<void(bool)> handle_program_state, bool headless_mode,
            std::unique_ptr<ToolCommSetup> tool_comm_setup, const std::string& calibration_checksum,
            const uint32_t reverse_port = 50001, const uint32_t script_sender_port = 50002, int servoj_gain = 2000,
@@ -351,6 +357,7 @@ public:
            double force_mode_damping = 0.025, double force_mode_gain_scaling = 0.5)
   {
     UrDriverConfiguration config;
+    config.robot_model = robot_model;
     config.robot_ip = robot_ip;
     config.script_file = script_file;
     config.output_recipe_file = output_recipe_file;
@@ -377,6 +384,7 @@ public:
    * \deprecated Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const
    *             UrDriverConfiguration& config) instead. This function will be removed in May 2027.
    *
+   * \param robot_model robot model.
    * \param robot_ip IP-address under which the robot is reachable.
    * \param script_file URScript file that should be sent to the robot.
    * \param output_recipe_file Filename where the output recipe is stored in.
@@ -406,7 +414,7 @@ public:
   // Called sigD in tests
   [[deprecated("Initializing a UrDriver object with an argument list is deprecated. Please use UrDriver(const "
                "UrDriverConfiguration& config) instead. This function will be removed in May 2027.")]]
-  UrDriver(const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
+  UrDriver(const std::string& robot_model, const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
            const std::string& input_recipe_file, std::function<void(bool)> handle_program_state, bool headless_mode,
            const std::string& calibration_checksum = "", const uint32_t reverse_port = 50001,
            const uint32_t script_sender_port = 50002, int servoj_gain = 2000, double servoj_lookahead_time = 0.03,
@@ -415,6 +423,7 @@ public:
            double force_mode_gain_scaling = 0.5)
   {
     UrDriverConfiguration config;
+    config.robot_model = robot_model;
     config.robot_ip = robot_ip;
     config.script_file = script_file;
     config.output_recipe_file = output_recipe_file;
@@ -936,6 +945,7 @@ private:
 
   std::function<void(bool)> handle_program_state_;
 
+  std::string robot_model_;
   std::string robot_ip_;
   bool in_headless_mode_;
   std::string full_robot_program_;

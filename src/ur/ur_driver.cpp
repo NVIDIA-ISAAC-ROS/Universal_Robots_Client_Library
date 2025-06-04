@@ -41,6 +41,14 @@
 
 namespace urcl
 {
+static const std::string UR3("ur3");
+static const std::string UR3e("ur3e");
+static const std::string UR5("ur5");
+static const std::string UR5e("ur5e");
+static const std::string UR10("ur10");
+static const std::string UR10e("ur10e");
+static const std::string UR16e("ur16e");
+
 static const std::string BEGIN_REPLACE("{{BEGIN_REPLACE}}");
 static const std::string JOINT_STATE_REPLACE("{{JOINT_STATE_REPLACE}}");
 static const std::string TIME_REPLACE("{{TIME_REPLACE}}");
@@ -56,6 +64,7 @@ static const std::string IMPEDANCE_CONTROL_REPLACE("{{IMPEDANCE_CONTROL_REPLACE}
 
 void UrDriver::init(const UrDriverConfiguration& config)
 {
+  robot_model_ = config.robot_model;
   robot_ip_ = config.robot_ip;
   non_blocking_read_ = config.non_blocking_read;
   servoj_gain_ = config.servoj_gain;
@@ -145,14 +154,25 @@ void UrDriver::init(const UrDriverConfiguration& config)
   prog.replace(prog.find(BEGIN_REPLACE), BEGIN_REPLACE.length(), begin_replace.str());
 
   std::stringstream impedance_control_replace;
-  if (robot_version_.major >= 5 && robot_version_.minor >= 22) {
-    /*
-      TODO(ayusmans): update max joint torques based on robot type
-      UR3/UR3e: [54.0, 54.0, 28.0, 9.0, 9.0, 9.0]
-      UR5/UR5e: [150.0, 150.0, 150.0, 28.0, 28.0, 28.0]
-      UR10/UR10e/UR16e: [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]
-    */
-    impedance_control_replace << "MAX_JOINT_TORQUES = [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]\n";
+  if (robot_version_.major >= 5 && robot_version_.minor >= 22)
+  {
+    if (robot_model_ == UR3 || robot_model_ == UR3e)
+    {
+      impedance_control_replace << "MAX_JOINT_TORQUES = [54.0, 54.0, 28.0, 9.0, 9.0, 9.0]\n";
+    }
+    else if (robot_model_ == UR5 || robot_model_ == UR5e)
+    {
+      impedance_control_replace << "MAX_JOINT_TORQUES = [150.0, 150.0, 150.0, 28.0, 28.0, 28.0]\n";
+    }
+    else if (robot_model_ == UR10 || robot_model_ == UR10e || robot_model_ == UR16e)
+    {
+      impedance_control_replace << "MAX_JOINT_TORQUES = [330.0, 330.0, 150.0, 54.0, 54.0, 54.0]\n";
+    }
+    else
+    {
+      impedance_control_replace << "popup(\"Unknown robot model '" << robot_model_ << "', disabling impedance control.\", error = True, blocking = False)\n"
+                                << "MAX_JOINT_TORQUES = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n";
+    }
     impedance_control_replace << "ZETA = 1.0\n"
                               << "K_P = MAX_JOINT_TORQUES * 4\n"
                               << "K_D = make_list(length(K_P), 0)\n"
@@ -173,7 +193,9 @@ void UrDriver::init(const UrDriverConfiguration& config)
                               << "end\n"
                               << "textmsg(\"impedance control ended\")\n"
                               << "stopj(STOPJ_ACCELERATION)";
-  } else {
+  }
+  else
+  {
     impedance_control_replace << "popup(\"Impedance control requires PolyScope 5.22 or greater.\", error = True, blocking = False)";
   }
   prog.replace(prog.find(IMPEDANCE_CONTROL_REPLACE), IMPEDANCE_CONTROL_REPLACE.length(), impedance_control_replace.str());
