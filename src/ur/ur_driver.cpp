@@ -155,7 +155,7 @@ void UrDriver::init(const UrDriverConfiguration& config)
   prog.replace(prog.find(BEGIN_REPLACE), BEGIN_REPLACE.length(), begin_replace.str());
 
   std::stringstream impedance_control_replace;
-  if (robot_version_.major >= 5 && robot_version_.minor >= 22)
+  if (robot_version_.major >= 5 && robot_version_.minor >= 23)
   {
     if (robot_model_ == UR3 || robot_model_ == UR3e)
     {
@@ -189,7 +189,7 @@ void UrDriver::init(const UrDriverConfiguration& config)
                               << "  q_dot = get_actual_joint_speeds()\n"
                               << "  q_err = cmd_servo_q - q\n"
                               << "  tau = K_P * q_err - K_D * q_dot\n"
-                              << "  torque_command(clamp_array(tau, MAX_JOINT_TORQUES), friction_comp=False)\n"
+                              << "  direct_torque(torque=clamp_array(tau, MAX_JOINT_TORQUES), friction_comp=False)\n"
                               << "  exit_critical\n"
                               << "end\n"
                               << "textmsg(\"impedance control ended\")\n"
