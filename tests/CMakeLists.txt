@@ -21,7 +21,12 @@ option(INTEGRATION_TESTS "Build the integration tests that require a running rob
 if (INTEGRATION_TESTS)
   # Integration tests require a robot reachable at 192.168.56.101. Therefore, they have to be
   # activated separately.
+  
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+  add_custom_target(generate_outputs ALL COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/resources/generate_rtde_outputs.py)
   add_executable(rtde_tests test_rtde_client.cpp)
+  add_dependencies(rtde_tests generate_outputs)
   target_link_libraries(rtde_tests PRIVATE ur_client_library::urcl GTest::gtest_main)
   gtest_add_tests(TARGET      rtde_tests
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -111,6 +116,8 @@ target_link_libraries(primary_parser_tests PRIVATE ur_client_library::urcl GTest
 gtest_add_tests(TARGET      primary_parser_tests
 )
 
+
+
 add_executable(rtde_data_package_tests test_rtde_data_package.cpp)
 target_link_libraries(rtde_data_package_tests PRIVATE ur_client_library::urcl GTest::gtest_main)
 gtest_add_tests(TARGET      rtde_data_package_tests
@@ -129,6 +136,13 @@ gtest_add_tests(TARGET      tcp_server_tests
 add_executable(script_sender_tests test_script_sender.cpp)
 target_link_libraries(script_sender_tests PRIVATE ur_client_library::urcl GTest::gtest_main)
 gtest_add_tests(TARGET      script_sender_tests
+)
+
+add_executable(script_reader_tests test_script_reader.cpp)
+target_link_libraries(script_reader_tests PRIVATE ur_client_library::urcl GTest::gtest_main)
+gtest_add_tests(
+        TARGET script_reader_tests
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_executable(reverse_interface_tests test_reverse_interface.cpp)
@@ -224,4 +238,9 @@ gtest_add_tests(TARGET robot_receive_timeout_tests
 add_executable(control_mode_tests test_control_mode.cpp)
 target_link_libraries(control_mode_tests PRIVATE ur_client_library::urcl GTest::gtest_main)
 gtest_add_tests(TARGET control_mode_tests
+)
+
+add_executable(helpers_tests test_helpers.cpp)
+target_link_libraries(helpers_tests PRIVATE ur_client_library::urcl GTest::gtest_main)
+gtest_add_tests(TARGET helpers_tests
 )

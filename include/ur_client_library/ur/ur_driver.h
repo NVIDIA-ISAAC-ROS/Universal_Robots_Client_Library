@@ -37,6 +37,7 @@
 #include "ur_client_library/control/reverse_interface.h"
 #include "ur_client_library/control/trajectory_point_interface.h"
 #include "ur_client_library/control/script_command_interface.h"
+#include "ur_client_library/control/script_reader.h"
 #include "ur_client_library/control/script_sender.h"
 #include "ur_client_library/ur/tool_communication.h"
 #include "ur_client_library/ur/version_information.h"
@@ -445,7 +446,7 @@ public:
     init(config);
   }
 
-  virtual ~UrDriver() = default;
+  ~UrDriver();
 
   /*!
    * \brief Access function to receive the latest data package sent from the robot through RTDE
@@ -725,6 +726,17 @@ public:
   bool endToolContact();
 
   /*!
+   * \brief Set friction compensation for the torque_command. If true the torque command will compensate for friction,
+   * if false it will not.
+   *
+   * \param friction_compensation_enabled Will set a friction_compensation_enabled variable in urscript, which will be
+   * used when calling torque_command
+   *
+   * \returns True, if the write was performed successfully, false otherwise.
+   */
+  bool setFrictionCompensation(const bool friction_compensation_enabled);
+
+  /*!
    * \brief Write a keepalive signal only.
    *
    * This signals the robot that the connection is still
@@ -832,10 +844,17 @@ public:
    *
    * \param trajectory_done_cb Callback function that will be triggered in the event of finishing
    * a trajectory execution
+   *
+   * \returns The ID of the callback that can be used to unregister the callback later.
    */
-  void registerTrajectoryDoneCallback(std::function<void(control::TrajectoryResult)> trajectory_done_cb)
+  uint32_t registerTrajectoryDoneCallback(std::function<void(control::TrajectoryResult)> trajectory_done_cb)
   {
-    trajectory_interface_->setTrajectoryEndCallback(trajectory_done_cb);
+    return trajectory_interface_->addTrajectoryEndCallback(trajectory_done_cb);
+  }
+
+  void unregisterTrajectoryDoneCallback(const uint32_t handler_id)
+  {
+    trajectory_interface_->removeTrajectoryEndCallback(handler_id);
   }
 
   /*!
@@ -896,11 +915,48 @@ public:
     primary_client_->stop();
   }
 
-  void registerTrajectoryInterfaceDisconnectedCallback(std::function<void(const int)> fun)
+  /*!
+   * \brief Register a callback for the trajectory interface disconnection.
+   *
+   * This callback will be called when the trajectory interface is disconnected.
+   *
+   * \param fun Callback function that will be triggered in the event of disconnection
+   *
+   * \returns The ID of the callback that can be used to unregister the callback later.
+   */
+  uint32_t registerTrajectoryInterfaceDisconnectedCallback(std::function<void(const int)> fun)
   {
-    trajectory_interface_->registerDisconnectionCallback(fun);
+    return trajectory_interface_->registerDisconnectionCallback(fun);
   }
 
+  /*!
+   * \brief Unregister a callback for the trajectory interface disconnection.
+   *
+   * This will remove the callback that was registered with
+   * registerTrajectoryInterfaceDisconnectedCallback.
+   *
+   * \param handler_id The ID of the callback to be removed as obtained from
+   * registerTrajectoryInterfaceDisconnectedCallback.
+   */
+  void unregisterTrajectoryInterfaceDisconnectedCallback(const uint32_t handler_id)
+  {
+    trajectory_interface_->unregisterDisconnectionCallback(handler_id);
+  }
+
+  /*!
+   * \brief Reads a script file and returns its content.
+   *
+   * This doesn't perform any substitutions on the file contents, but simply reads the file into a string.
+   *
+   * \deprecated This function isn't used. Please use the ScriptReader class instead. This function
+   * will be removed in May 2027.
+   *
+   * \param filename The name of the script file to read.
+   *
+   * \returns The content of the script file as a string.
+   */
+  [[deprecated("This function isn't used. Please use the ScriptReader class instead. This function will be removed in "
+               "May 2027.")]]
   static std::string readScriptFile(const std::string& filename);
 
   bool isReverseInterfaceConnected() const
@@ -931,6 +987,7 @@ private:
   std::unique_ptr<control::TrajectoryPointInterface> trajectory_interface_;
   std::unique_ptr<control::ScriptCommandInterface> script_command_interface_;
   std::unique_ptr<control::ScriptSender> script_sender_;
+  std::unique_ptr<control::ScriptReader> script_reader_;
 
   size_t socket_connection_attempts_ = 0;
   std::chrono::milliseconds socket_reconnection_timeout_ = std::chrono::milliseconds(10000);

@@ -1,3 +1,9 @@
+setup_file() {
+  echo "Pulling latest URSim Docker images for CB3 and PolyScope 5"
+  docker pull universalrobots/ursim_cb3:latest
+  docker pull universalrobots/ursim_e-series:latest
+}
+
 setup() {
     # get the containing directory of this file
     # use $BATS_TEST_FILENAME instead of ${BASH_SOURCE[0]} or $0,
@@ -37,6 +43,10 @@ setup() {
   get_series_from_model "ur3"
   echo "ROBOT_SERIES: $ROBOT_SERIES"
   [ "$ROBOT_SERIES" = "cb3" ]
+
+  get_series_from_model "ur15"
+  echo "ROBOT_SERIES: $ROBOT_SERIES"
+  [ "$ROBOT_SERIES" = "e-series" ]
 
   get_series_from_model "ur20"
   echo "ROBOT_SERIES: $ROBOT_SERIES"
@@ -145,7 +155,66 @@ setup() {
   test_input_handling
   [ "$ROBOT_MODEL" = "ur5e" ]
   [ "$ROBOT_SERIES" = "e-series" ]
-  [ "$URSIM_VERSION" = "latest" ]  
+  [ "$URSIM_VERSION" = "latest" ]
+}
+
+@test "test ur7e min version" {
+  run test_input_handling -m ur7e -v 3.14.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur7e -v 5.21.0
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur7e -v 10.8.0
+  echo "$output"
+  [ $status -eq 1 ]
+
+  run test_input_handling -m ur7e -v 5.22.0
+  echo "$output"
+  [ $status -eq 0 ]
+
+  run test_input_handling -m ur7e -v 10.9.0
+  echo "$output"
+  [ $status -eq 0 ]
+}
+
+@test "test ur12e min version" {
+  run test_input_handling -m ur12e -v 3.14.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur12e -v 5.21.0
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur12e -v 10.8.0
+  echo "$output"
+  [ $status -eq 1 ]
+
+  run test_input_handling -m ur12e -v 5.22.0
+  echo "$output"
+  [ $status -eq 0 ]
+
+  run test_input_handling -m ur12e -v 10.9.0
+  echo "$output"
+  [ $status -eq 0 ]
+}
+
+@test "test ur15 min version" {
+  run test_input_handling -m ur15 -v 3.14.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur15 -v 5.21.0
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur15 -v 10.7.0
+  echo "$output"
+  [ $status -eq 1 ]
+
+  run test_input_handling -m ur15 -v 5.22.0
+  echo "$output"
+  [ $status -eq 0 ]
+  run test_input_handling -m ur15 -v 10.8.0
+  echo "$output"
+  [ $status -eq 0 ]
 }
 
 @test "test ur20 min version" {
@@ -178,6 +247,42 @@ setup() {
   [ $status -eq 0 ]
 }
 
+@test "test ur8long min version" {
+  run test_input_handling -m ur8long -v 3.14.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur8long -v 5.22.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur8long -v 5.23.0
+  echo "$output"
+  [ $status -eq 0 ]
+  run test_input_handling -m ur8long -v 10.10.0
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur8long -v 10.11.0
+  echo "$output"
+  [ $status -eq 0 ]
+}
+
+@test "test ur18 min version" {
+  run test_input_handling -m ur18 -v 3.14.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur18 -v 5.22.3
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur18 -v 5.23.0
+  echo "$output"
+  [ $status -eq 0 ]
+  run test_input_handling -m ur18 -v 10.10.0
+  echo "$output"
+  [ $status -eq 1 ]
+  run test_input_handling -m ur18 -v 10.11.0
+  echo "$output"
+  [ $status -eq 0 ]
+}
+
 @test "unsupported versions raise error" {
   run main -v 1.2.3 -t
   echo "$output"
@@ -193,20 +298,12 @@ setup() {
   [ $status -eq 1 ]
 }
 
-@test "docker image polyscopex" {
-  run main -v 10.7.0 -t
-  echo "$output"
-  image=$(echo "$output" | tail -n1 | awk '{ print $NF }')
-  [ $status -eq 0 ]
-  [ "$image" == "universalrobots/ursim_polyscopex:0.12.159" ]
-}
-
 @test "docker image cb3 latest" {
   run main -m ur3 -t
   echo "$output"
   image=$(echo "$output" | tail -n1 | awk '{ print $NF }')
   [ $status -eq 0 ]
-  [ "$image" == "universalrobots/ursim_cb3:latest" ]
+  [[ "$image" =~ universalrobots/ursim_cb3:[0-9]+\.[0-9]+\.[0-9]+ ]]
 }
 
 @test "docker image e-series latest" {
@@ -214,7 +311,7 @@ setup() {
   echo "$output"
   image=$(echo "$output" | tail -n1 | awk '{ print $NF }')
   [ $status -eq 0 ]
-  [ "$image" == "universalrobots/ursim_e-series:latest" ]
+  [[ "$image" =~ universalrobots/ursim_e-series:[0-9]+\.[0-9]+\.[0-9]+ ]]
 }
 
 @test "docker image cb3 specific" {
@@ -315,6 +412,14 @@ setup() {
   strip_robot_model ur30 polyscopex
   echo "Robot model is: $ROBOT_MODEL"
   [ "$ROBOT_MODEL" = "UR30" ]
+
+  strip_robot_model ur7e e-series
+  echo "Robot model is: $ROBOT_MODEL"
+  [ "$ROBOT_MODEL" = "UR7e" ]
+
+  strip_robot_model ur12e e-series
+  echo "Robot model is: $ROBOT_MODEL"
+  [ "$ROBOT_MODEL" = "UR12e" ]
 }
 
 @test "help_prints_fine" {
@@ -457,5 +562,66 @@ setup() {
 @test "setting_detached_argument" {
   test_input_handling -d
   [ "$DETACHED" = "true" ]
+}
+
+@test "successful_validate_parameters" {
+  URSIM_VERSION="5.21.0"
+  ROBOT_MODEL="ur10e"
+  ROBOT_SERIES="e-series"
+
+  validate_parameters
+}
+
+@test "successful_validate_parameters_latest_e" {
+  URSIM_VERSION="latest"
+  ROBOT_MODEL="ur10e"
+  ROBOT_SERIES="e-series"
+
+  validate_parameters
+}
+
+@test "validate_parameters_on_invalid_model_fails_e" {
+  URSIM_VERSION="latest"
+  ROBOT_MODEL="ur10"
+  ROBOT_SERIES="e-series"
+
+  run validate_parameters
+  [ $status -eq 1 ]
+}
+
+@test "successful_validate_parameters_latest_cb3" {
+  URSIM_VERSION="latest"
+  ROBOT_MODEL="ur10"
+  ROBOT_SERIES="cb3"
+
+  validate_parameters
+}
+
+@test "validate_parameters_on_invalid_model_fails_cb3" {
+  URSIM_VERSION="latest"
+  ROBOT_MODEL="ur103"
+  ROBOT_SERIES="cb3"
+
+  run validate_parameters
+  [ $status -eq 1 ]
+}
+
+@test "validate_parameters_on_invalid_version_fails" {
+  URSIM_VERSION="foobar"
+  ROBOT_MODEL="ur10e"
+  ROBOT_SERIES="e-series"
+
+  run validate_parameters
+  [ $status -eq 1 ]
+}
+
+@test "validate_parameters_on_invalid_model_fails" {
+
+  URSIM_VERSION="5.21.0"
+  ROBOT_MODEL="ur10"
+  ROBOT_SERIES="e-series"
+  run validate_parameters
+  [ $status -eq 1 ]
+
 }
 

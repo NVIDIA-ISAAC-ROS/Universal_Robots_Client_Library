@@ -2,6 +2,58 @@
 Changelog for package ur_client_library
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.4.0 (2025-10-13)
+------------------
+* UR18 support (`#387 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/387>`_)
+* Remove output_bit_register_0...63 and input_bit_register_0..63 from RTDE list (`#385 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/385>`_)
+* Set force mode parameters from config (`#383 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/383>`_)
+* Direct torque control (`#381 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/381>`_)
+* Update RTDE list to include new fields (`#380 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/380>`_)
+* Add const qualifier to get functions and changed map value retrieval to at() function (`#379 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/379>`_)
+* Contributors: Dominic Reber, Felix Exner, Pablo David Aranda Rodriguez, URJala
+
+2.3.0 (2025-09-15)
+------------------
+* Install endian header on Windows and Apple only (`#372 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/372>`_)
+* Add support for UR8 LONG (`#375 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/375>`_)
+* Change ubuntu manpage link from bionic to noble (`#374 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/374>`_)
+* Bump actions/setup-python from 5 to 6 (`#373 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/373>`_)
+* Add possibility to register multiple callbacks to ReverseInterface and TrajectoryPointInterface (`#359 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/359>`_)
+* Contributors: Felix Exner, dependabot[bot]
+
+2.2.0 (2025-07-21)
+------------------
+* Remove print statement when executing optimovel primitives (`#365 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/365>`_)
+* Remove SDK version mapping (`#355 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/355>`_)
+* Support optimove motions in InstructionExecutor (`#354 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/354>`_)
+* Initialize ReverseInterface with a config struct (`#351 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/351>`_)
+* Join thread_move instead of killing it (`#349 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/349>`_)
+* Fix external_control urcapx version to 0.1.0 for PolyScope 10.7.0 (`#350 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/350>`_)
+* Contributors: Felix Exner
+
+2.1.0 (2025-06-18)
+------------------
+* Minimal support for building on macOS (`#341 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/341>`_)
+* Install endian.h and add that to the target include directories on Windows and MacOS (`#345 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/345>`_)
+* Add ScriptReader for script template parsing (`#343 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/343>`_)
+* Add more tests for VersionInformation (`#344 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/344>`_)
+* Fix driver branch for Jazzy downstream build (`#339 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/339>`_)
+* Stop control, when UrDriver object is destroyed (`#338 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/338>`_)
+* Add new robot types to URSim startup script (`#331 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/331>`_)
+* Fix robot message type POPUP (`#335 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/335>`_)
+* Disable checking links for two broken ones (`#333 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/333>`_)
+* readme: load ROSin imgs from press_kit repository (`#334 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/334>`_)
+* Added configuration data to packages parsed from the primary interface (`#327 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/327>`_)
+* Correct message sum in test_tool_contact (`#324 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/324>`_)
+* Fix the image sizes in architecture section (`#321 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/321>`_)
+* Check links using lychee (`#319 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/319>`_)
+* Update ROS distributions for industrial_ci (`#317 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/317>`_)
+* Support PolyScopeX simulator for 10.8.0 (`#315 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/315>`_)
+* Add an API reference page to the docs (`#314 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/314>`_)
+* Update documentation (`#309 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/309>`_)
+
+* Contributors: Andrew C. Morrow, Felix Exner, G.A. vd. Hoorn, Mads Holm Peters
+
 2.0.0 (2025-04-16)
 ------------------
 * Add functionality to send MoveP and MoveC instructions to the robot (`#303 <https://github.com/UniversalRobots/Universal_Robots_Client_Library/issues/303>`_)

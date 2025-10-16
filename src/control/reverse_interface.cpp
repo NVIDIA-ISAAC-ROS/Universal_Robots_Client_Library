@@ -35,10 +35,16 @@ namespace control
 {
 ReverseInterface::ReverseInterface(uint32_t port, std::function<void(bool)> handle_program_state,
                                    std::chrono::milliseconds step_time)
+  : ReverseInterface(ReverseInterfaceConfig{ port, handle_program_state, step_time })
+{
+}
+
+ReverseInterface::ReverseInterface(const ReverseInterfaceConfig& config)
   : client_fd_(INVALID_SOCKET)
-  , server_(port)
-  , handle_program_state_(handle_program_state)
-  , step_time_(step_time)
+  , server_(config.port)
+  , robot_software_version_(config.robot_software_version)
+  , handle_program_state_(config.handle_program_state)
+  , step_time_(config.step_time)
   , keep_alive_count_modified_deprecated_(false)
 {
   handle_program_state_(false);
@@ -232,6 +238,10 @@ void ReverseInterface::disconnectionCallback(const socket_t filedescriptor)
   URCL_LOG_INFO("Connection to reverse interface dropped.", filedescriptor);
   client_fd_ = INVALID_SOCKET;
   handle_program_state_(false);
+  for (auto handler : disconnect_callbacks_)
+  {
+    handler.function(filedescriptor);
+  }
 }
 
 void ReverseInterface::messageCallback(const socket_t filedescriptor, char* buffer, int nbytesrecv)

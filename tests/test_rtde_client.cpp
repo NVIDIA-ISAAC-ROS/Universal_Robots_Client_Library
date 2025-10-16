@@ -33,6 +33,7 @@
 #include <optional>
 #include <unordered_map>
 #include <utility>
+#include <iostream>
 #include "ur_client_library/exceptions.h"
 
 #include <ur_client_library/rtde/rtde_client.h>
@@ -59,6 +60,7 @@ protected:
 
   std::string output_recipe_file_ = "resources/rtde_output_recipe.txt";
   std::string exhaustive_output_recipe_file_ = "resources/exhaustive_rtde_output_recipe.txt";
+  std::string docs_output_recipe_file_ = "resources/docs_rtde_output_recipe.txt";
   std::string input_recipe_file_ = "resources/rtde_input_recipe.txt";
   comm::INotifier notifier_;
   std::unique_ptr<rtde_interface::RTDEClient> client_;
@@ -120,9 +122,12 @@ TEST_F(RTDEClientTest, no_recipe)
       UrException);
 
   // Only input recipe is unconfigured
-  EXPECT_THROW(
-      client_.reset(new rtde_interface::RTDEClient(g_ROBOT_IP, notifier_, output_recipe_file_, input_recipe_file)),
-      UrException);
+  EXPECT_NO_THROW(
+      client_.reset(new rtde_interface::RTDEClient(g_ROBOT_IP, notifier_, output_recipe_file_, input_recipe_file)));
+
+  EXPECT_THROW(client_.reset(new rtde_interface::RTDEClient(g_ROBOT_IP, notifier_, output_recipe_file_,
+                                                            "/i/do/not/exist/urclrtdetest.txt")),
+               UrException);
 }
 
 TEST_F(RTDEClientTest, empty_recipe_file)
@@ -375,11 +380,26 @@ TEST_F(RTDEClientTest, connect_non_running_robot)
 
 TEST_F(RTDEClientTest, check_all_rtde_output_variables_exist)
 {
+  const char* env_var = std::getenv("URSIM_VERSION");
+  if (env_var == nullptr)
+  {
+    std::cout << "No URSIM_VERSION environment variable set, skipping test." << std::endl;
+    GTEST_SKIP();
+  }
+  const std::string env_ursim_version(env_var);
+
+  if (env_ursim_version != "latest")
+  {
+    std::cout << "Not using the latest URSIM version, skipping test. URSIM_VERSION is set to '" << env_ursim_version
+              << "'" << std::endl;
+    GTEST_SKIP();
+  }
+
   client_->init();
 
   // Ignore unknown output variables to account for variables not available in old urcontrol versions.
   client_.reset(new rtde_interface::RTDEClient(g_ROBOT_IP, notifier_, exhaustive_output_recipe_file_,
-                                               input_recipe_file_, 0.0, true));
+                                               input_recipe_file_, 0.0, false));
 
   EXPECT_TRUE(client_->init());
   client_->start();
@@ -400,6 +420,51 @@ TEST_F(RTDEClientTest, check_all_rtde_output_variables_exist)
   client_->pause();
 }
 
+TEST_F(RTDEClientTest, check_rtde_data_fields_match_docs)
+{
+  std::ifstream docs_file(docs_output_recipe_file_);
+  std::ifstream pkg_file(exhaustive_output_recipe_file_);
+  std::vector<std::string> docs_outputs;
+  std::string line;
+  while (std::getline(docs_file, line))
+  {
+    docs_outputs.push_back(line);
+  }
+  std::vector<std::string> pkg_outputs;
+  while (std::getline(pkg_file, line))
+  {
+    pkg_outputs.push_back(line);
+  }
+  std::sort(docs_outputs.begin(), docs_outputs.end());
+  std::sort(pkg_outputs.begin(), pkg_outputs.end());
+  if (!std::is_permutation(docs_outputs.begin(), docs_outputs.end(), pkg_outputs.begin(), pkg_outputs.end()))
+  {
+    std::cout << "Data package output fields do not match output fields in documentation" << std::endl;
+    std::unordered_map<std::string, int> diff;
+    std::cout << "Differences: " << std::endl;
+    for (auto name : docs_outputs)
+    {
+      diff[name] += 1;
+    }
+    for (auto name : pkg_outputs)
+    {
+      diff[name] -= 1;
+    }
+    for (auto elem : diff)
+    {
+      if (elem.second > 0)
+      {
+        std::cout << elem.first << " exists in documentation, but not in data package dict." << std::endl;
+      }
+      if (elem.second < 0)
+      {
+        std::cout << elem.first << " exists in data package dict, but not in documentation." << std::endl;
+      }
+    }
+    GTEST_FAIL();
+  }
+}
+
 TEST_F(RTDEClientTest, check_unknown_rtde_output_variable)
 {
   client_->init();
@@ -411,6 +476,48 @@ TEST_F(RTDEClientTest, check_unknown_rtde_output_variable)
                                                0.0, false));
 
   EXPECT_THROW(client_->init(), UrException);
+}
+
+TEST_F(RTDEClientTest, empty_input_recipe)
+{
+  std::vector<std::string> empty_input_recipe = {};
+  client_.reset(new rtde_interface::RTDEClient(g_ROBOT_IP, notifier_, resources_output_recipe_, empty_input_recipe));
+  client_->init();
+  client_->start();
+
+  // Test that we can receive and parse the timestamp from the received package to prove the setup was successful
+  const std::chrono::milliseconds read_timeout{ 100 };
+  std::unique_ptr<rtde_interface::DataPackage> data_pkg = client_->getDataPackage(read_timeout);
+
+  if (data_pkg == nullptr)
+  {
+    std::cout << "Failed to get data package from robot" << std::endl;
+    GTEST_FAIL();
+  }
+
+  double timestamp;
+  EXPECT_TRUE(data_pkg->getData("timestamp", timestamp));
+
+  EXPECT_FALSE(client_->getWriter().sendStandardDigitalOutput(1, false));
+
+  client_->pause();
+
+  client_.reset(new rtde_interface::RTDEClient(g_ROBOT_IP, notifier_, output_recipe_file_, ""));
+  client_->init();
+  client_->start();
+
+  data_pkg = client_->getDataPackage(read_timeout);
+
+  if (data_pkg == nullptr)
+  {
+    std::cout << "Failed to get data package from robot" << std::endl;
+    GTEST_FAIL();
+  }
+  EXPECT_TRUE(data_pkg->getData("timestamp", timestamp));
+
+  EXPECT_FALSE(client_->getWriter().sendStandardDigitalOutput(1, false));
+
+  client_->pause();
 }
 
 int main(int argc, char* argv[])

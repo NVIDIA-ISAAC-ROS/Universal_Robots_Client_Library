@@ -33,8 +33,11 @@
 //----------------------------------------------------------------------
 
 #include "ur_client_library/ur/ur_driver.h"
+#include "ur_client_library/control/script_reader.h"
 #include "ur_client_library/exceptions.h"
+#include "ur_client_library/helpers.h"
 #include "ur_client_library/primary/primary_parser.h"
+#include "ur_client_library/helpers.h"
 #include <memory>
 #include <sstream>
 
@@ -50,18 +53,21 @@ static const std::string UR10("ur10");
 static const std::string UR10e("ur10e");
 static const std::string UR16e("ur16e");
 
-static const std::string BEGIN_REPLACE("{{BEGIN_REPLACE}}");
-static const std::string JOINT_STATE_REPLACE("{{JOINT_STATE_REPLACE}}");
-static const std::string TIME_REPLACE("{{TIME_REPLACE}}");
-static const std::string SERVO_J_REPLACE("{{SERVO_J_REPLACE}}");
-static const std::string SERVER_IP_REPLACE("{{SERVER_IP_REPLACE}}");
-static const std::string SERVER_PORT_REPLACE("{{SERVER_PORT_REPLACE}}");
-static const std::string TRAJECTORY_PORT_REPLACE("{{TRAJECTORY_SERVER_PORT_REPLACE}}");
-static const std::string SCRIPT_COMMAND_PORT_REPLACE("{{SCRIPT_COMMAND_SERVER_PORT_REPLACE}}");
-static const std::string FORCE_MODE_SET_DAMPING_REPLACE("{{FORCE_MODE_SET_DAMPING_REPLACE}}");
-static const std::string FORCE_MODE_SET_GAIN_SCALING_REPLACE("{{FORCE_MODE_SET_GAIN_SCALING_REPLACE}}");
+static const std::string BEGIN_REPLACE("BEGIN_REPLACE");
+static const std::string JOINT_STATE_REPLACE("JOINT_STATE_REPLACE");
+static const std::string TIME_REPLACE("TIME_REPLACE");
+static const std::string SERVO_J_REPLACE("SERVO_J_REPLACE");
+static const std::string SERVER_IP_REPLACE("SERVER_IP_REPLACE");
+static const std::string SERVER_PORT_REPLACE("SERVER_PORT_REPLACE");
+static const std::string TRAJECTORY_PORT_REPLACE("TRAJECTORY_SERVER_PORT_REPLACE");
+static const std::string SCRIPT_COMMAND_PORT_REPLACE("SCRIPT_COMMAND_SERVER_PORT_REPLACE");
 static const std::string IMPEDANCE_CONTROL_REPLACE("{{IMPEDANCE_CONTROL_REPLACE}}");
 
+UrDriver::~UrDriver()
+{
+  // This will return false if the external control script is not running.
+  stopControl();
+}
 
 void UrDriver::init(const UrDriverConfiguration& config)
 {
@@ -76,6 +82,8 @@ void UrDriver::init(const UrDriverConfiguration& config)
   socket_reconnection_timeout_ = config.socket_reconnection_timeout;
   rtde_initialization_attempts_ = config.rtde_initialization_attempts;
   rtde_initialization_timeout_ = config.rtde_initialization_timeout;
+  force_mode_gain_scale_factor_ = config.force_mode_gain_scaling;
+  force_mode_damping_factor_ = config.force_mode_damping;
 
   URCL_LOG_DEBUG("Initializing urdriver");
   URCL_LOG_DEBUG("Initializing RTDE client");
@@ -92,46 +100,35 @@ void UrDriver::init(const UrDriverConfiguration& config)
   // Figure out the ip automatically if the user didn't provide it
   std::string local_ip = config.reverse_ip.empty() ? rtde_client_->getIP() : config.reverse_ip;
 
-  std::string prog = readScriptFile(config.script_file);
-  while (prog.find(JOINT_STATE_REPLACE) != std::string::npos)
+  trajectory_interface_.reset(new control::TrajectoryPointInterface(config.trajectory_port));
+  control::ReverseInterfaceConfig script_command_config;
+  script_command_config.port = config.script_command_port;
+  script_command_config.robot_software_version = rtde_client_->getVersion();
+  script_command_interface_.reset(new control::ScriptCommandInterface(script_command_config));
+
+  startPrimaryClientCommunication();
+
+  std::chrono::milliseconds timeout(1000);
+  try
   {
-    prog.replace(prog.find(JOINT_STATE_REPLACE), JOINT_STATE_REPLACE.length(),
-                 std::to_string(control::ReverseInterface::MULT_JOINTSTATE));
+    waitFor([this]() { return primary_client_->getConfigurationData() != nullptr; }, timeout);
   }
-  while (prog.find(TIME_REPLACE) != std::string::npos)
+  catch (const TimeoutException&)
   {
-    prog.replace(prog.find(TIME_REPLACE), TIME_REPLACE.length(),
-                 std::to_string(control::TrajectoryPointInterface::MULT_TIME));
+    throw TimeoutException("Could not get configuration package within timeout, are you connected to the robot?",
+                           timeout);
   }
 
+  control::ScriptReader::DataDict data;
+  data[JOINT_STATE_REPLACE] = std::to_string(control::ReverseInterface::MULT_JOINTSTATE);
+  data[TIME_REPLACE] = std::to_string(control::TrajectoryPointInterface::MULT_TIME);
   std::ostringstream out;
   out << "lookahead_time=" << servoj_lookahead_time_ << ", gain=" << servoj_gain_;
-  while (prog.find(SERVO_J_REPLACE) != std::string::npos)
-  {
-    prog.replace(prog.find(SERVO_J_REPLACE), SERVO_J_REPLACE.length(), out.str());
-  }
-
-  while (prog.find(SERVER_IP_REPLACE) != std::string::npos)
-  {
-    prog.replace(prog.find(SERVER_IP_REPLACE), SERVER_IP_REPLACE.length(), local_ip);
-  }
-
-  while (prog.find(SERVER_PORT_REPLACE) != std::string::npos)
-  {
-    prog.replace(prog.find(SERVER_PORT_REPLACE), SERVER_PORT_REPLACE.length(), std::to_string(config.reverse_port));
-  }
-
-  while (prog.find(TRAJECTORY_PORT_REPLACE) != std::string::npos)
-  {
-    prog.replace(prog.find(TRAJECTORY_PORT_REPLACE), TRAJECTORY_PORT_REPLACE.length(),
-                 std::to_string(config.trajectory_port));
-  }
-
-  while (prog.find(SCRIPT_COMMAND_PORT_REPLACE) != std::string::npos)
-  {
-    prog.replace(prog.find(SCRIPT_COMMAND_PORT_REPLACE), SCRIPT_COMMAND_PORT_REPLACE.length(),
-                 std::to_string(config.script_command_port));
-  }
+  data[SERVO_J_REPLACE] = out.str();
+  data[SERVER_IP_REPLACE] = local_ip;
+  data[SERVER_PORT_REPLACE] = std::to_string(config.reverse_port);
+  data[TRAJECTORY_PORT_REPLACE] = std::to_string(config.trajectory_port);
+  data[SCRIPT_COMMAND_PORT_REPLACE] = std::to_string(config.script_command_port);
 
   robot_version_ = rtde_client_->getVersion();
 
@@ -152,7 +149,7 @@ void UrDriver::init(const UrDriverConfiguration& config)
                   << config.tool_comm_setup->getStopBits() << ", " << config.tool_comm_setup->getRxIdleChars() << ", "
                   << config.tool_comm_setup->getTxIdleChars() << ")";
   }
-  prog.replace(prog.find(BEGIN_REPLACE), BEGIN_REPLACE.length(), begin_replace.str());
+  data[BEGIN_REPLACE] = begin_replace.str();
 
   std::stringstream impedance_control_replace;
   if (robot_version_.major >= 5 && robot_version_.minor >= 23)
@@ -197,14 +194,15 @@ void UrDriver::init(const UrDriverConfiguration& config)
   }
   else
   {
-    impedance_control_replace << "popup(\"Impedance control requires PolyScope 5.22 or greater.\", error = True, blocking = False)";
+    impedance_control_replace << "popup(\"Impedance control requires PolyScope 5.23 or greater.\", error = True, blocking = False)";
   }
-  prog.replace(prog.find(IMPEDANCE_CONTROL_REPLACE), IMPEDANCE_CONTROL_REPLACE.length(), impedance_control_replace.str());
+  data[IMPEDANCE_CONTROL_REPLACE] = impedance_control_replace.str();
 
-  trajectory_interface_.reset(new control::TrajectoryPointInterface(config.trajectory_port));
-  script_command_interface_.reset(new control::ScriptCommandInterface(config.script_command_port));
+  data["ROBOT_SOFTWARE_VERSION"] = getVersion();
 
-  startPrimaryClientCommunication();
+  script_reader_.reset(new control::ScriptReader());
+  std::string prog = script_reader_->readScriptFile(config.script_file, data);
+
   if (in_headless_mode_)
   {
     full_robot_program_ = "stop program\n";
@@ -586,6 +584,19 @@ bool UrDriver::endToolContact()
   }
 }
 
+bool UrDriver::setFrictionCompensation(const bool friction_compensation_enabled)
+{
+  if (script_command_interface_->clientConnected())
+  {
+    return script_command_interface_->setFrictionCompensation(friction_compensation_enabled);
+  }
+  else
+  {
+    URCL_LOG_ERROR("Script command interface is not running. Unable to set friction compensation.");
+    return 0;
+  }
+}
+
 bool UrDriver::writeKeepalive(const RobotReceiveTimeout& robot_receive_timeout)
 {
   vector6d_t* fake = nullptr;
@@ -700,7 +711,12 @@ void UrDriver::setupReverseInterface(const uint32_t reverse_port)
 {
   auto rtde_frequency = rtde_client_->getTargetFrequency();
   auto step_time = std::chrono::milliseconds(static_cast<int>(1000 / rtde_frequency));
-  reverse_interface_.reset(new control::ReverseInterface(reverse_port, handle_program_state_, step_time));
+  control::ReverseInterfaceConfig config;
+  config.step_time = step_time;
+  config.port = reverse_port;
+  config.handle_program_state = handle_program_state_;
+  config.robot_software_version = robot_version_;
+  reverse_interface_.reset(new control::ReverseInterface(config));
 }
 
 void UrDriver::startPrimaryClientCommunication()

@@ -31,6 +31,7 @@
 
 #include "ur_client_library/control/reverse_interface.h"
 #include "ur_client_library/ur/tool_communication.h"
+#include "ur_client_library/ur/version_information.h"
 
 namespace urcl
 {
@@ -61,7 +62,16 @@ public:
    *
    * \param port Port to start the server on
    */
+  [[deprecated("Use ReverseInterfaceConfig instead of port, handle_program_state and step_time parameters")]]
   ScriptCommandInterface(uint32_t port);
+
+  /*!
+   * \brief Creates a ScriptCommandInterface object, including a new TCPServer
+   *
+   * \param config Configuration for the ReverseInterface, including the port to start the server
+   * on.
+   */
+  ScriptCommandInterface(const ReverseInterfaceConfig& config);
 
   /*!
    * \brief Zero the force torque sensor
@@ -148,6 +158,17 @@ public:
   bool endToolContact();
 
   /*!
+   * \brief Set friction compensation for the torque_command. If true the torque command will compensate for friction,
+   * if false it will not.
+   *
+   * \param friction_compensation_enabled Will set a friction_compensation_enabled variable in urscript, which will be
+   * used when calling torque_command
+   *
+   * \returns True, if the write was performed successfully, false otherwise.
+   */
+  bool setFrictionCompensation(const bool friction_compensation_enabled);
+
+  /*!
    * \brief  Returns whether a client/robot is connected to this server.
    *
    */
@@ -177,14 +198,34 @@ private:
   enum class ScriptCommand : int32_t
   {
 
-    ZERO_FTSENSOR = 0,       ///< Zero force torque sensor
-    SET_PAYLOAD = 1,         ///< Set payload
-    SET_TOOL_VOLTAGE = 2,    ///< Set tool voltage
-    START_FORCE_MODE = 3,    ///< Start force mode
-    END_FORCE_MODE = 4,      ///< End force mode
-    START_TOOL_CONTACT = 5,  ///< Start detecting tool contact
-    END_TOOL_CONTACT = 6,    ///< End detecting tool contact
+    ZERO_FTSENSOR = 0,              ///< Zero force torque sensor
+    SET_PAYLOAD = 1,                ///< Set payload
+    SET_TOOL_VOLTAGE = 2,           ///< Set tool voltage
+    START_FORCE_MODE = 3,           ///< Start force mode
+    END_FORCE_MODE = 4,             ///< End force mode
+    START_TOOL_CONTACT = 5,         ///< Start detecting tool contact
+    END_TOOL_CONTACT = 6,           ///< End detecting tool contact
+    SET_FRICTION_COMPENSATION = 7,  ///< Set friction compensation
   };
+
+  /*!
+   * \brief Checks if the robot version is higher than the minimum required version for Polyscope 5
+   * or Polyscope X.
+   *
+   * If the robot version is lower than the minimum required version, this function
+   * will log a warning message.
+   * In case of a PolyScope 5 robot, the robot's software version will be checked against \p
+   * min_polyscope5, and in case of a PolyScope X robot, it will be checked against \p
+   * min_polyscopeX.
+   *
+   * \param min_polyscope5 Minimum required version for PolyScope 5
+   * \param min_polyscopeX Minimum required version for PolyScope X
+   * \param command_name Name of the command being checked, used for logging
+   *
+   * \returns True if the robot version is higher than the versions provided, false otherwise.
+   */
+  bool robotVersionSupportsCommandOrWarn(const VersionInformation& min_polyscope5,
+                                         const VersionInformation& min_polyscopeX, const std::string& command_name);
 
   bool client_connected_;
   static const int MAX_MESSAGE_LENGTH = 28;

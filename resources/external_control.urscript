@@ -8,6 +8,8 @@ textmsg("ExternalControl: steptime=", steptime)
 MULT_jointstate = {{JOINT_STATE_REPLACE}}
 MULT_time = {{TIME_REPLACE}}
 
+DEBUG = False
+
 STOPJ_ACCELERATION = 4.0
 
 #Constants
@@ -36,6 +38,8 @@ MOTION_TYPE_MOVEJ = 0
 MOTION_TYPE_MOVEL = 1
 MOTION_TYPE_MOVEP = 2
 MOTION_TYPE_MOVEC = 3
+MOTION_TYPE_OPTIMOVEJ = 4
+MOTION_TYPE_OPTIMOVEL = 5
 MOTION_TYPE_SPLINE = 51
 TRAJECTORY_DATA_DIMENSION = 3 * 6 + 1
 
@@ -50,6 +54,7 @@ START_FORCE_MODE = 3
 END_FORCE_MODE = 4
 START_TOOL_CONTACT = 5
 END_TOOL_CONTACT = 6
+SET_FRICTION_COMPENSATION = 7
 SCRIPT_COMMAND_DATA_DIMENSION = 28
 
 FREEDRIVE_MODE_START = 1
@@ -71,6 +76,7 @@ JOINT_IGNORE_SPEED = 20.0
 global violation_popup_counter = 0
 global cmd_servo_state = SERVO_UNINITIALIZED
 global cmd_servo_qd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+global cmd_torque = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 global cmd_servo_q = get_joint_positions()
 global cmd_servo_q_last = cmd_servo_q
 global cmd_twist = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -82,6 +88,7 @@ global spline_qdd = [0, 0, 0, 0, 0, 0]
 global spline_qd = [0, 0, 0, 0, 0, 0]
 global tool_contact_running = False
 global trajectory_result = 0
+global friction_compensation_enabled = True
 
 # Global thread variables
 thread_move = 0
@@ -250,6 +257,32 @@ thread speedThread():
     speedj(qd, 40.0, steptime)
   end
   textmsg("ExternalControl: speedj thread ended")
+  stopj(STOPJ_ACCELERATION)
+end
+
+# Helpers for torque control
+def set_torque(target_torque):
+  cmd_torque = target_torque
+  control_mode = MODE_TORQUE
+end
+
+thread torqueThread():
+  textmsg("ExternalControl: Starting torque thread")
+  while control_mode == MODE_TORQUE:
+    torque = cmd_torque
+    {% if ROBOT_SOFTWARE_VERSION >= v5.23.0 %}
+      {% if ROBOT_SOFTWARE_VERSION < v6.0.0 %}
+    direct_torque(torque, friction_comp=friction_compensation_enabled)
+      {% elif ROBOT_SOFTWARE_VERSION >= v10.11.0 %}
+    direct_torque(torque, friction_comp=friction_compensation_enabled)
+      {% else %}
+    popup("Torque control is only supported from software 10.11.0 and upwards.", error=True, blocking=True)
+      {% endif %}
+    {% else %}
+    popup("Torque control is only supported from software 5.23.0 and upwards.", error=True, blocking=True)
+    {% endif %}
+  end
+  textmsg("ExternalControl: torque thread ended")
   stopj(STOPJ_ACCELERATION)
 end
 
@@ -579,6 +612,63 @@ thread trajectoryThread():
           clear_remaining_trajectory_points()
           trajectory_result = TRAJECTORY_RESULT_FAILURE
         end
+
+      # OptimoveJ point
+      elif raw_point[INDEX_POINT_TYPE] == MOTION_TYPE_OPTIMOVEJ:
+        acceleration = raw_point[13] / MULT_jointstate
+        velocity = raw_point[7] / MULT_jointstate
+        {% if ROBOT_SOFTWARE_VERSION >= v5.21.0 %}
+          {% if ROBOT_SOFTWARE_VERSION < v6.0.0 %}
+        optimovej(q, a = acceleration, v = velocity, r = blend_radius)
+          {% elif ROBOT_SOFTWARE_VERSION >= v10.8.0 %}
+        optimovej(q, a = acceleration, v = velocity, r = blend_radius)
+          {% else %}
+        popup("Optimovej is only supported from software 10.8.0 and upwards.", error=True, blocking=False)
+          {% endif %}
+        {% else %}
+        popup("Optimovej is only supported from software 5.21.0 and upwards.", error=True, blocking=False)
+        {% endif %}
+
+        if DEBUG:
+          textmsg(str_cat("optimovej(", str_cat(
+            str_cat("q=", q), str_cat(
+              str_cat(", a=", acceleration), str_cat(
+                str_cat(", v=", velocity), str_cat(
+                  str_cat(", r=", blend_radius), ")"))))))
+        end
+
+        # reset old acceleration
+        spline_qdd = [0, 0, 0, 0, 0, 0]
+        spline_qd = [0, 0, 0, 0, 0, 0]
+
+      # OptimoveL point
+      elif raw_point[INDEX_POINT_TYPE] == MOTION_TYPE_OPTIMOVEL:
+        acceleration = raw_point[13] / MULT_jointstate
+        velocity = raw_point[7] / MULT_jointstate
+        
+        {% if ROBOT_SOFTWARE_VERSION >= v5.21.0 %}
+          {% if ROBOT_SOFTWARE_VERSION < v6.0.0 %}
+        optimovel(p[q[0], q[1], q[2], q[3], q[4], q[5]], a = acceleration, v = velocity, r = blend_radius)
+          {% elif ROBOT_SOFTWARE_VERSION >= v10.8.0 %}
+        optimovel(p[q[0], q[1], q[2], q[3], q[4], q[5]], a = acceleration, v = velocity, r = blend_radius)
+          {% else %}
+        popup("Optimovel is only supported from software 10.8.0 and upwards.", error=True, blocking=False)
+          {% endif %}
+        {% else %}
+        popup("Optimovel is only supported from software 5.21.0 and upwards.", error=True, blocking=False)
+        {% endif %}
+
+        if DEBUG:
+          textmsg(str_cat("optimovel(", str_cat(
+            str_cat("q=", p[q[0], q[1], q[2], q[3], q[4], q[5]]), str_cat(
+              str_cat(", a=", acceleration), str_cat(
+                str_cat(", v=", velocity), str_cat(
+                  str_cat(", r=", blend_radius), ")"))))))
+        end
+
+        # reset old acceleration
+        spline_qdd = [0, 0, 0, 0, 0, 0]
+        spline_qd = [0, 0, 0, 0, 0, 0]
       end
     else:
       textmsg("Receiving trajectory point failed!")
@@ -723,6 +813,12 @@ thread script_commands():
           socket_send_int(UNTIL_TOOL_CONTACT_RESULT_CANCELED, "script_command_socket")
         end
         tool_contact_running = False
+      elif command == SET_FRICTION_COMPENSATION:
+        if raw_command[2] == 0:
+          friction_compensation_enabled = False
+        else:
+          friction_compensation_enabled = True
+        end
       end
     end
   end
@@ -780,6 +876,8 @@ while control_mode > MODE_STOPPED:
         thread_move = run servoThread()
       elif control_mode == MODE_SPEEDJ:
         thread_move = run speedThread()
+      elif control_mode == MODE_TORQUE:
+        thread_move = run torqueThread()
       elif control_mode == MODE_FORWARD:
         kill thread_move
         stopj(STOPJ_ACCELERATION)
@@ -801,6 +899,9 @@ while control_mode > MODE_STOPPED:
     elif control_mode == MODE_SPEEDJ:
       qd = [params_mult[2] / MULT_jointstate, params_mult[3] / MULT_jointstate, params_mult[4] / MULT_jointstate, params_mult[5] / MULT_jointstate, params_mult[6] / MULT_jointstate, params_mult[7] / MULT_jointstate]
       set_speed(qd)
+    elif control_mode == MODE_TORQUE:
+      torque = [params_mult[2]/ MULT_jointstate, params_mult[3]/ MULT_jointstate, params_mult[4]/ MULT_jointstate, params_mult[5]/ MULT_jointstate, params_mult[6]/ MULT_jointstate, params_mult[7]/ MULT_jointstate]
+      set_torque(torque)
     elif control_mode == MODE_FORWARD:
       if params_mult[2] == TRAJECTORY_MODE_RECEIVE:
         kill thread_trajectory
@@ -844,7 +945,7 @@ while control_mode > MODE_STOPPED:
 end
 
 textmsg("ExternalControl: Stopping communication and control")
-kill thread_move
+join thread_move
 kill thread_trajectory
 kill thread_script_commands
 stopj(STOPJ_ACCELERATION)
