@@ -27,7 +27,8 @@ MODE_SPEEDL = 4
 MODE_POSE = 5
 MODE_FREEDRIVE = 6
 MODE_TOOL_IN_CONTACT = 7
-MODE_IMPEDANCE = 8
+MODE_TORQUE = 8
+MODE_IMPEDANCE = 9
 # Data dimensions of the message received on the reverse interface
 REVERSE_INTERFACE_DATA_DIMENSION = 8
 
